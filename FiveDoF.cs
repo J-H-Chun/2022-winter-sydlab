@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using System.Runtime.InteropServices;
@@ -9,42 +9,14 @@ using UnityEngine.UI;
 
 public class FiveDoF : MonoBehaviour
 {
-    /* C++ 동적 링크 라이브러리(DLL) 사용 안함*/
+    public static extern void PlaneDetect(int index, int fx, int fy);
 
-    //private const string NATIVE_LIBRARY_NAME = "C:/myUnity/5DOF/Assets/5DoF";
-    //[DllImport(NATIVE_LIBRARY_NAME)]
-    //private static extern int nativeMakeLFSpace(string dir, int height = 1024, int width = 2048);
-    //
-    //[DllImport(NATIVE_LIBRARY_NAME)]
-    //private static extern int nativeUpdatePicture(int posX = 50); 
-    //
-    //// Start is called before the first frame update
-    /*
-        [DllImport("DLL_test")]
-        public static extern void Calc_depth();
-        [DllImport("DLL_test")]
-        public static extern double Add(double left_name, double right_name);
-        [DllImport("ConsoleApplication1")]
-        private static extern double mat_test(double a);
-        */
-    /*
-        [DllImport("RGBD_TEST")]
-        public static extern void read_image();
-
-        [DllImport("RGBD_TEST")]
-        public static extern void PlaneDetect(string color_filename, string depth_filename, string output_folder);
-
-        */
-
-    [DllImport("RGBD_LAST")] // Not used... ? maybe ...
-    public static extern void PlaneDetect(int index,int fx,int fy); // Not used
-
-    ////////////////////// Variables /////////////////////////
+    ////////////////////// 변수 /////////////////////////
 
     GameObject LFS = null; // 3D 구의 LF Space -> 이 LFS 에 360 이미지 mapping 하고 카메라로 보는 방식으로 VR 구현
     Camera MainCam = null; // 유니티 player (user) view 생성하는 메인캠
     Vector3 v = new Vector3(0.1f, 0.0f, 0.0f); // 포지션 좌우 이동시 피연산 벡터
-    int currentPos = 50; // 디폴트 포지션 (0050.jpg) -> 처음 이미지 로딩할 때 불러오는 이미지 #
+    int currentPos = 50; // 디폴트 포지션 (0050.jpg) -> 처음 이미지 로딩할 때 불러오는 이미지
 
     // 이미지, Depth 디렉토리 경로
     string directoryName = "SAMPLE/"; // 이미지 경로
@@ -52,56 +24,54 @@ public class FiveDoF : MonoBehaviour
     int maxImgIdx = 631;   // 이미지 마지막 index (631.jpg) -> refer to "directoryName" folder
 
     GameObject depth_mesh; // Depth 로 생성되는 mesh (배경) object
-    GameObject AR_object; // Depth mesh 와 interact 되는 AR_object 
+    GameObject AR_object; // Depth mesh 와 interact 되는 AR_object (농구공)
 
-    // Depth_mesh object 구현위한 variagble 들
-    MeshFilter mesh_filter;
-    MeshRenderer Mesh_render;
-    Mesh mesh;
-    MeshCollider mesh_collider;
-    Material mesh_mat;
+    // Depth_mesh object 구현을 위한 변수들 (유니티)
+    MeshFilter mesh_filter; // 메쉬를 저장하는 컴포넌트. 메쉬에 디자인을 덧씌우는 역할 - 메쉬 : 3D 모델의 3차원 형상정보
+    MeshRenderer Mesh_render; // 메쉬 렌더링을 하는 컴포넌트
+    Mesh mesh; 
+    MeshCollider mesh_collider; // 메쉬가 '물리적'으로 충돌하는 부분을 표현하는 컴포넌트
+    Material mesh_mat; // 특정 메쉬를 얼마나 타일링하고, 표면의 질감은 어떻게 할 건지를 설정하는 컴포넌트
     Vector3 worldPoint;
 
-    // AR_object 좌표 및 방향 저장하는 global variable
-    Vector3 worldPoint_depth = new Vector3(5.0f, 105.0f, 5.0f); 
+    // AR_object의 좌표 및 방향을 저장하는 전역변수
+    Vector3 worldPoint_depth = new Vector3(5.0f, 105.0f, 5.0f);
     Vector3 worldRot_depth;
     Vector3 AR_mesh_position;
 
-    // Depth mesh object 좌표 저장하는 global variable
+    // Depth mesh object 좌표를 저장하는 전역변수
     Vector3 ocllusion_pos;
 
-    //User 화면에 보이게 될 정보 저장하는 variable
+    //User 화면에 보이게 될 정보를 저장하는 변수
     Texture2D screenShot_image;
     Texture2D screenShot;
 
     int sample_number = 3; // Computational cost 때문에 mesh sampling 을 depth 3pixel 당 1 pixel 만 vertices 로 변경
     public bool nowReading_depth { get; private set; } // Depth 로 mesh 변경 flag
 
-    Vector3[] sub_vertices; // depth_mesh 저장하는 vertices variable
+    Vector3[] sub_vertices; // depth_mesh를 저장하는 꼭짓점 변수
 
     float timer;
     int waiting_time;
     bool scene;
     int index = 0;
- 
-    ///////////////////////////////////////////////////////////////////////////////////
 
-    public GameObject[] brick; // Not used
-    Quaternion originalRotation; // Not used
-    public GameObject prefab; // Not used
-    GameObject LFD = null; // Not used
-    GameObject BG = null; // Not used
-    GameObject AR = null; // Not used
-    int current_left = 245; // Not used
-    int current_right = 255; // Not used
-    public bool nowCapturing { get; private set; } // Not used
-    public bool nowDetecting_plane { get; private set; } // Not used 
-    Vector3 originalPosition; // Not used...? maybe
-    SphereCollider sphere; // Not used ...? maybe
+    Quaternion originalRotation; // 회전량 
+    public GameObject[] brick; 
+    public GameObject prefab; 
+    GameObject LFD = null; 
+    GameObject BG = null; 
+    GameObject AR = null; 
+    int current_left = 255; 
+    int current_right = 255; 
+    public bool nowCapturing { get; private set; } 
+    public bool nowDetecting_plane { get; private set; } 
+    Vector3 originalPosition; 
+    SphereCollider sphere;
 
     //   PointCloudExporter.PointCloudGenerator pt_generator = new PointCloudExporter.PointCloudGenerator();
 
-    public void set_GameObject(int renderSizeX, int renderSizeY, int sample_number) // Not used
+    public void set_GameObject(int renderSizeX, int renderSizeY, int sample_number) // 초기 object
     {
         //brick = new GameObject[(renderSizeX*renderSizeY)/sample_number ];
         brick = new GameObject[168063];
@@ -112,30 +82,31 @@ public class FiveDoF : MonoBehaviour
     {
         // 동기화 플래그 설정
         nowCapturing = true;
-        
-        // 화면 캡쳐를 위한 코루틴 시작
+
+        // 화면 캡쳐를 위한 코루틴 시작 - 코루틴? 스레드를 중단하지 않으면서 비동기적으로 실행되는 코드 / 비동기? 'TV를 보면서 밥을 먹는다' 와 같은 한번에 여러개의 작업을 동시에 하는 것
         Debug.Log("Capture on going");
-        StartCoroutine(RenderToTexture(640, 480,capture_name));
+        StartCoroutine(RenderToTexture(640, 480, capture_name));
     }
 
-    private IEnumerator RenderToTexture(int renderSizeX, int renderSizeY,string capture_name) // Capture screen script, utilize this if needed. 
+    private IEnumerator RenderToTexture(int renderSizeX, int renderSizeY, string capture_name) // Capture screen script, utilize this if needed. 
     {
 
- //       int targetWidth = uitextureForSave.width;
-   //     int targetHeight = uitextureForSave.height;
+        //     int targetWidth = uitextureForSave.width;
+        //     int targetHeight = uitextureForSave.height;
 
         //RenderTexture 생성
         RenderTexture rt = new RenderTexture(renderSizeX, renderSizeY, 24);
+
         //RenderTexture 저장을 위한 Texture2D 생성
         Texture2D screenShot = new Texture2D(renderSizeX, renderSizeY, TextureFormat.ARGB32, false);
 
         // 카메라에 RenderTexture 할당
         MainCam.targetTexture = rt;
 
-        // 각 카메라가 보고 있는 화면을 랜더링
+        // 각 카메라가 보고 있는 화면을 렌더링
         MainCam.Render();
 
-        // read 하기 위해, 랜더링 된 RenderTexture를 RenderTexture.active에 설정
+        // read 하기 위해 렌더링 된 RenderTexture를 RenderTexture.active에 설정
         RenderTexture.active = rt;
 
         // RenderTexture.active에 설정된 RenderTexture를 read 합니다.
@@ -149,7 +120,7 @@ public class FiveDoF : MonoBehaviour
         // 사용한 것들 해제
         RenderTexture.active = null;
         MainCam.targetTexture = null;
-//        _uiCamera.targetTexture = null;
+        //        _uiCamera.targetTexture = null;
         Destroy(rt);
 
         // 동기화 플래그 해제
@@ -160,7 +131,7 @@ public class FiveDoF : MonoBehaviour
 
     private static System.Diagnostics.Stopwatch sw_ReadImg = new System.Diagnostics.Stopwatch();
 
-    public void Do_PlaneDetect(string capture_name) // Not used
+    public void Do_PlaneDetect(string capture_name) 
     {
         // 동기화 플래그 설정
         nowDetecting_plane = true;
@@ -170,25 +141,23 @@ public class FiveDoF : MonoBehaviour
         StartCoroutine(RenderToPlane(640, 480, capture_name));
     }
 
-    private IEnumerator RenderToPlane(int renderSizeX, int renderSizeY, string capture_name) // 구현 X 
+    private IEnumerator RenderToPlane(int renderSizeX, int renderSizeY, string capture_name) 
     {
-               yield return new WaitForEndOfFrame();
-
-        //       int targetWidth = uitextureForSave.width;
-        //     int targetHeight = uitextureForSave.height;
+        yield return new WaitForEndOfFrame();
 
         //RenderTexture 생성
         RenderTexture rt = new RenderTexture(renderSizeX, renderSizeY, 24);
+
         //RenderTexture 저장을 위한 Texture2D 생성
         Texture2D screenShot = new Texture2D(renderSizeX, renderSizeY, TextureFormat.ARGB32, false);
 
         // 카메라에 RenderTexture 할당
         MainCam.targetTexture = rt;
 
-        // 각 카메라가 보고 있는 화면을 랜더링 합니다.
+        // 각 카메라가 보고 있는 화면을 렌더링 합니다.
         MainCam.Render();
 
-        // read 하기 위해, 랜더링 된 RenderTexture를 RenderTexture.active에 설정
+        // read 하기 위해, 렌더링 된 RenderTexture를 RenderTexture.active에 설정
         RenderTexture.active = rt;
 
         // RenderTexture.active에 설정된 RenderTexture를 read 합니다.
@@ -219,53 +188,49 @@ public class FiveDoF : MonoBehaviour
 
     public void Do_ReadDepth(bool start)
     {
-        nowReading_depth = true;
-      
-        
-        if (start) { 
-            StartCoroutine(ReadDepth(Screen.width,Screen.height,start));
+        nowReading_depth = true; // bool
+
+        if (start)
+        {
+            StartCoroutine(ReadDepth(Screen.width, Screen.height, start)); // Depth 읽기 코루틴 시작 (start 될 시)
         }
         else
         {
-            StartCoroutine(Move_depth(Screen.width, Screen.height));
+            StartCoroutine(Move_depth(Screen.width, Screen.height)); // 그게 아니라면 depth 이동
         }
-        
+
     } // Depth 읽고 mesh 로 변경하는 wrap code
 
-    // function that read depth value & initialize meshes
-    private IEnumerator ReadDepth(int renderSizeX, int renderSizeY,bool Start)
+    
+
+    private IEnumerator ReadDepth(int renderSizeX, int renderSizeY, bool Start) // depth 값을 읽고 mesh depth를 초기화하는 함수
     {
         yield return new WaitForEndOfFrame();
 
-        int num_vertices = (renderSizeX / sample_number) * (renderSizeY / sample_number);
+        int num_vertices = (renderSizeX / sample_number) * (renderSizeY / sample_number); // 꼭짓점 개수 계산식
         mesh = new Mesh();
         depth_mesh = GameObject.Find("Depth_mesh");
         Mesh_render = depth_mesh.GetComponent<MeshRenderer>();
-        mesh_filter = depth_mesh.AddComponent<MeshFilter>();
-        //Mesh_render = depth_mesh.AddComponent<MeshRenderer>();
+        mesh_filter = depth_mesh.AddComponent<MeshFilter>(); // 왜 여기만 Get이 아니고 Add인지?
         mesh_collider = depth_mesh.GetComponent<MeshCollider>();
 
-        
+
         sub_vertices = new Vector3[num_vertices];
-        int[,] TwoD_indices = new int[renderSizeX / sample_number, renderSizeY / sample_number];
+        int[,] TwoD_indices = new int[renderSizeX / sample_number, renderSizeY / sample_number]; // indices ?
 
         mesh_mat = new Material(Shader.Find("VideoPlaneNoLight"));
 
         mesh_mat.enableInstancing = true;
 
-        
+
 
         directoryName = "SAMPLE_depth/";
         LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
-        RenderTexture rt = new RenderTexture(renderSizeX, renderSizeY, 24);        
+        RenderTexture rt = new RenderTexture(renderSizeX, renderSizeY, 24);
 
-        Texture2D screenShot = new Texture2D(renderSizeX, renderSizeY, TextureFormat.ARGB32, false);
-
-        
+        Texture2D screenShot = new Texture2D(renderSizeX, renderSizeY, TextureFormat.ARGB32, false); // ARGB32 Texture Import format
 
         MainCam.targetTexture = rt;
-
-
         MainCam.Render();
 
         RenderTexture.active = rt;
@@ -275,56 +240,57 @@ public class FiveDoF : MonoBehaviour
 
         mesh_mat.SetTexture("texture", screenShot);
         Mesh_render.GetComponent<MeshRenderer>().material = mesh_mat;
-       
-        if (Start) {
 
-            for (int x = 0; x < renderSizeX/sample_number; x++)
-             {
-                 for(int y = 0; y< renderSizeY/sample_number; y++)
-                {
-                  
-                  ocllusion_pos.x = sample_number * x;
-                  ocllusion_pos.y = sample_number * y;              
-                  ocllusion_pos.z = (screenShot.GetPixel(sample_number *x, sample_number *y).grayscale);
+        if (Start)
+        {
 
-                  worldPoint = Camera.main.ScreenToWorldPoint(ocllusion_pos);
-                  sub_vertices[(renderSizeY/sample_number) * (x) + (y)] = worldPoint;
-          
-                }
-            }
-
-            //variable to calculate the triangle mesh;
-            for(int row = 0; row < renderSizeX/sample_number; row++)
+            for (int x = 0; x < renderSizeX / sample_number; x++)
             {
-                for(int col = 0; col < renderSizeY/sample_number; col++)
+                for (int y = 0; y < renderSizeY / sample_number; y++)
                 {
-                      TwoD_indices[row,col] = (renderSizeY/sample_number) * row + col;
+
+                    ocllusion_pos.x = sample_number * x;
+                    ocllusion_pos.y = sample_number * y;
+                    ocllusion_pos.z = (screenShot.GetPixel(sample_number * x, sample_number * y).grayscale);
+
+                    worldPoint = Camera.main.ScreenToWorldPoint(ocllusion_pos);
+                    sub_vertices[(renderSizeY / sample_number) * (x) + (y)] = worldPoint;
+
+                }
+            }
+
+            // 삼각형 메쉬 계산 변수
+            for (int row = 0; row < renderSizeX / sample_number; row++)
+            {
+                for (int col = 0; col < renderSizeY / sample_number; col++)
+                {
+                    TwoD_indices[row, col] = (renderSizeY / sample_number) * row + col;
                 }
 
             }
-            ////////////////////////////////// mseh initialization //////////////
+            ////////////// mesh initialization //////////////
             mesh.vertices = sub_vertices;
 
             List<int> triangles = new List<int>();
-            for (int row = 1; row < (renderSizeX/sample_number)-1; row++)
+            for (int row = 1; row < (renderSizeX / sample_number) - 1; row++)
             {
-                for (int col = 1; col < (renderSizeY/sample_number)-1; col++)
+                for (int col = 1; col < (renderSizeY / sample_number) - 1; col++)
                 {
-                    triangles.Add(TwoD_indices[row,col]) ;
-                    triangles.Add(TwoD_indices[row+1, col]);
-                    triangles.Add(TwoD_indices[row, col+1]);
+                    triangles.Add(TwoD_indices[row, col]);
+                    triangles.Add(TwoD_indices[row + 1, col]);
+                    triangles.Add(TwoD_indices[row, col + 1]);
 
 
                     triangles.Add(TwoD_indices[row, col]);
-                    triangles.Add(TwoD_indices[row -1, col]);
-                    triangles.Add(TwoD_indices[row , col - 1 ]);     
-                                   
+                    triangles.Add(TwoD_indices[row - 1, col]);
+                    triangles.Add(TwoD_indices[row, col - 1]);
+
                 }
             }
 
             triangles.Reverse();
-                  
-            mesh.triangles = triangles.ToArray();                                     
+
+            mesh.triangles = triangles.ToArray();
             Vector2[] uv = new Vector2[num_vertices];
 
 
@@ -351,7 +317,7 @@ public class FiveDoF : MonoBehaviour
         }
         mesh_collider.sharedMesh = mesh;
         mesh_collider.convex = true;
-   //     mesh_collider.isTrigger = true;
+        //     mesh_collider.isTrigger = true;
 
         RenderTexture.active = null;
         MainCam.targetTexture = null;
@@ -363,11 +329,11 @@ public class FiveDoF : MonoBehaviour
 
         yield return 0;
     } // Depth 읽고 mesh initialize 하는 함수
-   
-    // Modify the meshes according to the user-view 
+
+    // 사용자의 view에 따라 메쉬 수정
     private IEnumerator Move_depth(int renderSizeX, int renderSizeY)
     {
-        
+
         UnityEngine.Object.Destroy(screenShot);
         UnityEngine.Object.Destroy(screenShot_image);
         mesh_collider.convex = false;
@@ -380,12 +346,8 @@ public class FiveDoF : MonoBehaviour
 
         screenShot = new Texture2D(renderSizeX, renderSizeY, TextureFormat.ARGB32, false);
 
-
         MainCam.targetTexture = rt;
-
-
         MainCam.Render();
-
         RenderTexture.active = rt;
 
         screenShot.ReadPixels(new Rect(0, 0, renderSizeX, renderSizeY), 0, 0);
@@ -411,46 +373,30 @@ public class FiveDoF : MonoBehaviour
 
         Mesh_render.material.SetTexture("_MainTex", screenShot);
 
-       
+
         // Make depth_mesh transparent;; 
-        Mesh_render.material.SetColor("_Color",Color.clear);
-       
+        Mesh_render.material.SetColor("_Color", Color.clear);
+
         for (int x = 0; x < renderSizeX / sample_number; x++)
         {
             for (int y = 0; y < renderSizeY / sample_number; y++)
             {
                 ocllusion_pos.x = x * sample_number;
                 ocllusion_pos.y = y * sample_number;
+                ocllusion_pos.z = (1 / (screenShot.GetPixel(sample_number * x, sample_number * y).grayscale));   
 
-                ////////////////////////////////////////////////// For better interaction, proper setting is required ///////////////////////////////////////
-
-                //                ocllusion_pos.z = (float)3 * (1 - (float)(0.6) * (screenShot.GetPixel(sample_number * x, sample_number * y).grayscale));
-                //              ocllusion_pos.z = (float)8 * (1 - (float)(0.6)*(screenShot.GetPixel(sample_number * x, sample_number * y).grayscale)) - (float)3;
-                ocllusion_pos.z = (1 /  (screenShot.GetPixel(sample_number * x, sample_number * y).grayscale));
-//                ocllusion_pos.z = (float)20 * (1 - (float)(0.99) * (screenShot.GetPixel(sample_number * x, sample_number * y).grayscale));
-//                ocllusion_pos.z = (float)10 * (1 - (float)(0.99)*(screenShot.GetPixel(sample_number * x, sample_number * y).grayscale)) ;
-                //Vector3 worldPoint = ocllusion_pos;     
                 worldPoint = Camera.main.ScreenToWorldPoint(ocllusion_pos);
-
-  //              worldPoint_depth = worldPoint;
-//                worldPoint_depth.z = worldPoint.z - 00.0f;
-  //              worldPoint_depth.x = worldPoint.x - 3.2f;
-   //            worldPoint_depth.y = worldPoint.y - 3.2f;
-        //        worldPoint_depth.z = worldPoint.z + 0.0f;
-
                 worldRot_depth = MainCam.transform.forward;
 
                 sub_vertices[(renderSizeY / sample_number) * (x) + (y)] = worldPoint;
             }
         }
-        
+
         mesh.vertices = sub_vertices;
         mesh_filter.mesh = mesh;
 
         RenderTexture.active = null;
         MainCam.targetTexture = null;
-
-
 
         Destroy(rt);
         Destroy(rt_image);
@@ -464,37 +410,32 @@ public class FiveDoF : MonoBehaviour
     // 정해진 좌표로 AR_object reset
     void reset_object(GameObject AR)
     {
-        // AR.transform.position = worldPoint_depth;
         AR.transform.position = AR_mesh_position;
-        
     }
 
     // 카메라가 보는 방향으로 AR_object throw
-    void throw_object(GameObject AR,int speed)
+    void throw_object(GameObject AR, int speed)
     {
         AR.transform.position = worldPoint_depth;
-        //        AR.GetComponent<Rigidbody>().velocity = transform.forward * speed;
+
         AR.GetComponent<Rigidbody>().velocity = worldRot_depth * speed;
-        AR.GetComponent<Rigidbody>().useGravity = true;
+        AR.GetComponent<Rigidbody>().useGravity = true; // 중력 적용
 
     }
 
 
-    void Start() // 플레이버튼 누를 시 최초 1회만 실행
+    void Start() 
     {
 
         MainCam = GameObject.FindWithTag("MainCamera").GetComponent<Camera>(); // 메인캠 접근 위해 카메라를 찾음
-                                             
+
         // Init AR_object                                  
         AR_object = GameObject.Find("ARobject_mesh");
         AR_mesh_position = AR_object.transform.position;
- 
 
         originalPosition = MainCam.transform.position;
-      
         originalRotation = MainCam.transform.localRotation;
 
-        // 
         LFS = GameObject.Find("LFSpace"); // LF
         LFS.GetComponent<Renderer>().enabled = true;
 
@@ -506,41 +447,12 @@ public class FiveDoF : MonoBehaviour
         currentPos = 1;
 
         LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D; //구에 입힐 최초 이미지
-        
+
         Do_ReadDepth(true); // Mesh flag on
-
-/*
-        LFD = GameObject.Find("LFDepth"); // LF
-        LFD.GetComponent<Renderer>().enabled = true;
-
-        var color_depth = LFD.GetComponent<Renderer>().material.color;
-        var newColor_depth = new Color(color_depth.r, color_depth.g, color_depth.b, 0.5f);
-        LFD.GetComponent<Renderer>().material.color = newColor_depth;
-
-        LFD.GetComponent<Renderer>().material.shader = Shader.Find("Unlit/Pano360Shader"); // 구에 입혀진 텍스쳐를 렌더링하기 위해 쉐이더 로드
-        currentPos = 1;
-
-        LFD.GetComponent<Renderer>().material.mainTexture = Resources.Load(depth_directoryName + currentPos.ToString("D4")) as Texture2D; //구에 입힐 최초 이미지
-/*        
-        /*      
-              LFS_left = GameObject.Find("LFSpace_Left"); // LF
-              LFS_left.GetComponent<Renderer>().enabled = true;
-              LFS_left.GetComponent<Renderer>().material.shader = Shader.Find("Unlit/Pano360Shader"); // 구에 입혀진 텍스쳐를 렌더링하기 위해 쉐이더 로드
-              current_left = currentPos - 5;
-              LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + current_left.ToString("D4")) as Texture2D; //구에 입힐 최초 이미지
-
-
-              LFS_right = GameObject.Find("LFSpace_Right"); // LF
-              LFS_right.GetComponent<Renderer>().enabled = true;
-              LFS_right.GetComponent<Renderer>().material.shader = Shader.Find("Unlit/Pano360Shader"); // 구에 입혀진 텍스쳐를 렌더링하기 위해 쉐이더 로드
-              current_right = currentPos + 5;
-              LFS_right.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + current_right.ToString("D4")) as Texture2D; //구에 입힐 최초 이미지
-              */
 
         sw_ReadImg.Reset();
     }
 
-    // Update is called once per frame
     void Update()
     {
         sw_ReadImg.Reset();
@@ -554,12 +466,12 @@ public class FiveDoF : MonoBehaviour
             timer = 0;
         }
 
-        if (Input.GetKeyUp(KeyCode.Y)) // DO Capture screen 
+        if (Input.GetKeyUp(KeyCode.Y)) // 화면 캡쳐 
         {
 
             string fmt = "00000";
             string file_path = "C:/Users/yuniw/Desktop/Unity5DoF/data/";
-            string filename = "img_" + index.ToString()+".png";
+            string filename = "img_" + index.ToString() + ".png";
 
             directoryName = "SAMPLE/";
             LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
@@ -572,11 +484,12 @@ public class FiveDoF : MonoBehaviour
             CaptureScreen(file_path + filename_depth);
 
             int fx = 383;
-//            PlaneDetect(index,fx, fx);
-            
+            //            PlaneDetect(index,fx, fx);
+
         }
 
-        if (Input.GetKeyDown(KeyCode.P)){
+        if (Input.GetKeyDown(KeyCode.P))
+        {
             Do_ReadDepth(false);
         }
 
@@ -607,16 +520,14 @@ public class FiveDoF : MonoBehaviour
             currentPos = currentPos + 5;
             current_left = currentPos - 5;
             current_right = currentPos + 5;
-            
+
             if (currentPos > maxImgIdx)
             {
                 currentPos = maxImgIdx;
             }
-
-  
             LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
         }
-        
+
         if (Input.GetKey(KeyCode.A)) // 카메라 좌측 이동
         {
             currentPos = currentPos - 5;
@@ -627,116 +538,12 @@ public class FiveDoF : MonoBehaviour
             {
                 currentPos = 1;
             }
-
             LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
-
         }
-   /*
-        if (Input.GetKey(KeyCode.L)) // Not used
-        {
-            string file_path = "Plane_Test/";
-            string filename = "img.png";
-            directoryName = "SAMPLE/";
-            LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
-            CaptureScreen(file_path + filename);
-
-            string filename2 = "depth.png";
-
-            directoryName = "SAMPLE_depth/";
-            LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
-            CaptureScreen(file_path + filename2);
-        }
-        */
-        /*
-        if (Input.GetKeyDown(KeyCode.T)) // Not used
-        {
-            Debug.Log("capture_on_going");
-            currentPos = 1;
-            int file_index = 0;
-
-            float maxImgIdx = 100;
-            float angle = 0;
-            float angle_diff = 5;
-            string fmt = "00000";
-            float rotAverageY = 0;
-            float rotAverageX = 180;
-            Quaternion yQuaternion = Quaternion.AngleAxis(rotAverageY, Vector3.left);
-            Quaternion xQuaternion = Quaternion.AngleAxis(rotAverageX, Vector3.up);
-
-            MainCam.transform.localRotation = originalRotation * xQuaternion * yQuaternion;
-            originalRotation = MainCam.transform.localRotation;
-            for (int i = 0; i < maxImgIdx - 1; i++) // 가로 방향
-            {
-         //       i = 5 * i;
-                for (float j = 0; j < 1; j++) // 세로 방향 
-                {
-                    for (float k = 0; k < 19; k++)
-                    {
-                      
-                        if (k < 5)
-                        {
-                            angle = 180 + k * angle_diff; //180~200
-                        }
-                        else if ((4 < k) && (k< 10))
-                        {
-                            angle = 180 + (9 - k) * angle_diff; // 200~180
-                          
-
-                        }
-                        else if((10 <= k) && (k<=13))
-                        {
-                            angle = 180 - (k-9) * angle_diff; // 180~160
-                        }
-                        else if ((14<=k) && (k <= 18))
-                        {
-                            angle = 180 - (18 - k) * angle_diff; //160~180
-                        }
-                        Debug.Log(angle);
-
-                        rotAverageY = 0;
-                        rotAverageX = angle;
-                      
-                        yQuaternion = Quaternion.AngleAxis(rotAverageY, Vector3.left);
-                        xQuaternion = Quaternion.AngleAxis(rotAverageX, Vector3.up);
-
-                        MainCam.transform.localRotation = originalRotation * xQuaternion * yQuaternion;
-
-                        Debug.Log("capture light_field");
-                        //   originalPosition.x = originalPosition.x + 0.2f * i;
-                        currentPos = currentPos + 5 * i;
-                        LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
-                        LFD.GetComponent<Renderer>().material.mainTexture = Resources.Load(depth_directoryName + currentPos.ToString("D4")) as Texture2D;
-                        //              originalPosition.y = originalPosition.y + 0.2f * j;
-                        Debug.Log(currentPos);
-                        transform.localPosition = originalPosition;
-
-                        string file_path = "VR_testset/";
-                        //                  string filename = "cap" + i.ToString() + "_" + j.ToString() + ".png";  // 
-                        string filename = file_index.ToString(fmt) + ".png";
-                    //    string filename = file_index.ToString() + ".png";
-                        CaptureScreen(file_path + filename);
-                        //      GameObject.Find("LFpace").GetComponent<FiveDoF>().CaptureScreen(filename);
-
-                        currentPos = currentPos - 5 * i;
-                        LFS.GetComponent<Renderer>().material.mainTexture = Resources.Load(directoryName + currentPos.ToString("D4")) as Texture2D;
-                        LFD.GetComponent<Renderer>().material.mainTexture = Resources.Load(depth_directoryName + currentPos.ToString("D4")) as Texture2D;
-                        //   originalPosition.x = originalPosition.x - 0.2f * i;
-                        //            originalPosition.y = originalPosition.y - 0.2f * j;
-                        transform.localPosition = originalPosition;
-                        file_index++;
-                    }
-
-                }
-            }
-        }
-        */
-
         sw_ReadImg.Stop();
- //       UnityEngine.Debug.Log("LoadLF : " + sw_ReadImg.ElapsedTicks / 10 + " us");
-   //     Debug.Log("mousePointer:" + Input.mousePosition.x);
     }
 
-    public void LFS_setup(GameObject LFS_temp,string object_name,int current_pos)
+    public void LFS_setup(GameObject LFS_temp, string object_name, int current_pos) // LF Space 설정 코드
     {
         LFS_temp = GameObject.Find(object_name); // LF
         LFS_temp.GetComponent<Renderer>().enabled = true;
